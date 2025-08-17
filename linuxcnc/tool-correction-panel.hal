@@ -1,0 +1,72 @@
+# --- Custom HAL: Encoder correction with sample_hold + scaled_s32_sums ---
+
+# Load Arduino connector (userspace component providing arduino.counter.N, arduino.floatvar.N, etc.)
+loadusr arduino-connector
+
+# =======================================================================================
+# ------------------------------------ DRIK CORRECTION ----------------------------------
+# =======================================================================================
+
+# Load realtime components
+# sample_hold      → captures the current integer value when hold pin is pulsed
+# scaled_s32_sums → performs (s32_in0 * scale0) + (s32_in1 * scale1)
+loadrt sample_hold      names=corr-drik-enc-hold
+loadrt scaled_s32_sums  names=corr-drik-enc-diff
+
+# Add components to the servo thread
+addf corr-drik-enc-hold   servo-thread
+addf corr-drik-enc-diff   servo-thread
+
+# Configure parameters
+# scale0 = 0.005 → converts encoder counts to user units (e.g. mm)
+# scale1 = -0.005 → subtracts the held value (also scaled)
+setp corr-drik-enc-diff.scale0  0.005
+setp corr-drik-enc-diff.scale1 -0.005
+
+# Net connections
+# Raw encoder counts from Arduino
+net corr-drik-enc-raw       arduino.counter.0        => corr-drik-enc-diff.in0
+net corr-drik-enc-raw                                 => corr-drik-enc-hold.in
+
+# Latched encoder value (captured on hold pulse)
+net corr-drik-enc-latched   corr-drik-enc-hold.out   => corr-drik-enc-diff.in1
+
+# Resulting relative (zeroed) correction value in float
+net corr-drik-val           corr-drik-enc-diff.out-f => arduino.lcd.floatvar.0
+
+
+# =======================================================================================
+# ------------------------------------ VYSKA CORRECTION ---------------------------------
+# =======================================================================================
+
+# Load realtime components
+loadrt sample_hold      names=corr-vyska-enc-hold
+loadrt scaled_s32_sums  names=corr-vyska-enc-diff
+
+# Add components to the servo thread
+addf corr-vyska-enc-hold   servo-thread
+addf corr-vyska-enc-diff   servo-thread
+
+# Configure parameters
+setp corr-vyska-enc-diff.scale0  0.005
+setp corr-vyska-enc-diff.scale1 -0.005
+
+# Net connections
+# Raw encoder counts from Arduino
+net corr-vyska-enc-raw       arduino.counter.1        => corr-vyska-enc-diff.in0
+net corr-vyska-enc-raw                                  => corr-vyska-enc-hold.in
+
+# Latched encoder value (captured on hold pulse)
+net corr-vyska-enc-latched   corr-vyska-enc-hold.out  => corr-vyska-enc-diff.in1
+
+# Resulting relative (zeroed) correction value in float
+net corr-vyska-val           corr-vyska-enc-diff.out-f => arduino.lcd.floatvar.1
+
+
+# =======================================================================================
+# ------------------------------ RESET SIGNAL FROM G-CODE -------------------------------
+# =======================================================================================
+
+# Reset pulse from G-code (M64/M65 P3) triggers sample_hold latch for both encoders
+net corr-reset   motion.digital-out-03  => corr-drik-enc-hold.hold
+net corr-reset                          => corr-vyska-enc-hold.hold

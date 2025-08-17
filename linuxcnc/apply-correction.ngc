@@ -1,0 +1,27 @@
+G8
+G90 G94 G18
+G21
+G54
+
+; Select right tool
+T3 M6 G43
+G4 P0.5
+
+; Apply correction drik
+#<corr_drik> = [#<_hal[corr-drik-enc-diff.out-f]> / 2]
+G10 L1 P3 X[#5401 + #<corr_drik>]
+G4 P0.1
+G43
+
+; Apply correction vyska
+#<corr_vyska> = #<_hal[corr-vyska-enc-diff.out-f]>
+G10 L2 P1 Z[#5223 + 0.005]
+G4 P0.1
+G54
+
+; Reset correction value on panel
+M65 P3
+G4 P0.1
+M64 P3
+
+M2
